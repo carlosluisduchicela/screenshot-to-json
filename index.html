@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>screenshot-to-json — screenshot in, structured record out</title>
+<meta name="description" content="Paste or OCR the text from a screenshot/save and get a structured JSON record. Heuristic extraction, runs fully in your browser.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <header>
+    <h1>screenshot-to-json</h1>
+    <p class="tagline">Screenshot in, structured record out. Paste the text from a
+    save — or OCR an image in your browser — and get clean JSON.</p>
+    <p class="honest">No server, no server-side LLM. OCR is optional and runs
+    in your browser; pasting text works fully offline. Extraction is
+    heuristic and will miss things — see the notes under the output.</p>
+  </header>
+
+  <section aria-labelledby="image-heading">
+    <h2 id="image-heading">1. Image (optional)</h2>
+    <div class="row">
+      <input type="file" id="image-input" accept="image/*">
+      <button type="button" id="ocr-button">OCR my image</button>
+    </div>
+    <img id="preview" class="preview" alt="Preview of the selected image" hidden>
+    <p class="hint">OCR loads Tesseract.js from a CDN only when you click the
+    button. If it can’t load, you’ll get a clear message and can paste text instead.</p>
+  </section>
+
+  <section aria-labelledby="text-heading">
+    <h2 id="text-heading">2. Text</h2>
+    <div class="row wrap">
+      <span class="hint">Try a fake sample:</span>
+      <button type="button" id="sample-place">Restaurant save</button>
+      <button type="button" id="sample-event">Concert save</button>
+      <button type="button" id="sample-product">Product save</button>
+    </div>
+    <label class="sr-only" for="input-text">Text from a screenshot or save</label>
+    <textarea id="input-text" rows="9" spellcheck="false"
+      placeholder="Paste text copied or OCR'd from a screenshot here…"></textarea>
+    <div class="row">
+      <button type="button" id="extract-button" class="primary">Extract → JSON</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="output-heading">
+    <h2 id="output-heading">3. Structured JSON</h2>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <pre id="output" class="output">{ }
+Load a sample, paste text, then click “Extract → JSON”.</pre>
+    <div class="row" id="result-actions" hidden>
+      <button type="button" id="copy-button">Copy JSON</button>
+      <button type="button" id="download-button">Download JSON</button>
+    </div>
+    <p class="hint">Every field carries a confidence note. “high” means an
+    explicit pattern was found in the text; the title and the record type are
+    always guesses — verify them.</p>
+  </section>
+
+  <footer>
+    <p>Python core: <code>python3 extractor.py sample/event-concert.txt</code> ·
+    Heuristic demo — a production version would add an LLM structured-extraction
+    pass (bring your own key). MIT licensed.</p>
+  </footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
