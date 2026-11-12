@@ -1,0 +1,10 @@
+Settings — Account
+Profile
+Name: Robin Ellis
+Email: robin.ellis@example.com
+Phone: (646) 555-0183
+Notifications: On
+Language: English
+Privacy & security
+Support: https://example.com/support
+Version 4.2.0

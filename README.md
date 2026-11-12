@@ -1,6 +1,6 @@
 # screenshot-to-json
 
-Screenshot in, structured record out — paste or OCR the text from a save and get clean JSON, with a confidence note on every field.
+Screenshot in, structured record out — an extraction workbench: paste or OCR the text from any app screen and get clean JSON, with a confidence bar on every field and hover-to-source highlighting that shows where each field was found.
 
 **Live demo:** open `index.html` in a browser (or serve this folder with any static host / GitHub Pages). No build step, no server.
 
@@ -46,11 +46,17 @@ fully offline.
   load or the OCR fails, you get a plain-language message and can paste text
   instead.
 - **Paste-text extraction** from anything: a screenshot’s copied text, a
-  share-sheet dump, OCR output from another tool.
-- **Three fake samples** built into the demo (restaurant save, concert save,
-  product save) — the same files as in `sample/` for the Python CLI.
-- **Structured output** as pretty-printed JSON, with **Copy JSON** and
-  **Download JSON** buttons.
+  share-sheet dump, OCR output from another tool. Extraction runs as you
+  type — no button required.
+- **Clickable screen samples** built into the demo: a checkout screen, a
+  settings page, and a profile card (plus the classic restaurant / concert /
+  product saves). All sample data is fake; the files live in `sample/`.
+- **A workbench, not a text box:** per-field confidence bars that animate
+  in, a “Needs a second look” panel that treats guesses and gaps as a
+  designed review state, and hover-any-field highlighting that shows exactly
+  where in the source text each value was found.
+- **Structured output** as syntax-highlighted JSON, with **Copy JSON** and
+  **Download** buttons in the JSON pane.
 
 ## What the extractor finds
 

@@ -3,64 +3,135 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>screenshot-to-json — screenshot in, structured record out</title>
-<meta name="description" content="Paste or OCR the text from a screenshot/save and get a structured JSON record. Heuristic extraction, runs fully in your browser.">
+<title>screenshot-to-json — messy screen in, clean JSON out</title>
+<meta name="description" content="An extraction workbench: paste the text from any app screen and get a structured JSON record with per-field confidence. Runs fully in your browser.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <main class="page">
-  <header>
-    <h1>screenshot-to-json</h1>
-    <p class="tagline">Screenshot in, structured record out. Paste the text from a
-    save — or OCR an image in your browser — and get clean JSON.</p>
-    <p class="honest">No server, no server-side LLM. OCR is optional and runs
-    in your browser; pasting text works fully offline. Extraction is
-    heuristic and will miss things — see the notes under the output.</p>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">{ ; }</span>
+      <span class="brand-name">screenshot-to-json</span>
+    </div>
+    <span class="badge">no server · nothing leaves your browser</span>
   </header>
 
-  <section aria-labelledby="image-heading">
-    <h2 id="image-heading">1. Image (optional)</h2>
-    <div class="row">
-      <input type="file" id="image-input" accept="image/*">
-      <button type="button" id="ocr-button">OCR my image</button>
-    </div>
-    <img id="preview" class="preview" alt="Preview of the selected image" hidden>
-    <p class="hint">OCR loads Tesseract.js from a CDN only when you click the
-    button. If it can’t load, you’ll get a clear message and can paste text instead.</p>
+  <section class="hero">
+    <h1>Messy screen in.<br>Clean JSON out.</h1>
+    <p class="tagline">Paste the text from any app screen — a checkout, a settings
+    page, a profile — and get a structured record with a confidence check on
+    every field. Hover a field to see exactly where it was found.</p>
   </section>
 
-  <section aria-labelledby="text-heading">
-    <h2 id="text-heading">2. Text</h2>
-    <div class="row wrap">
-      <span class="hint">Try a fake sample:</span>
-      <button type="button" id="sample-place">Restaurant save</button>
-      <button type="button" id="sample-event">Concert save</button>
-      <button type="button" id="sample-product">Product save</button>
+  <section aria-labelledby="samples-heading">
+    <div class="section-head">
+      <h2 id="samples-heading">Try a screen</h2>
+      <span class="hint">Click one — extraction is instant.</span>
     </div>
-    <label class="sr-only" for="input-text">Text from a screenshot or save</label>
-    <textarea id="input-text" rows="9" spellcheck="false"
-      placeholder="Paste text copied or OCR'd from a screenshot here…"></textarea>
-    <div class="row">
-      <button type="button" id="extract-button" class="primary">Extract → JSON</button>
+    <div class="sample-grid">
+      <button type="button" class="sample-card" id="sample-checkout">
+        <span class="screen">
+          <span class="screen-bar"><i></i><i></i><i></i><span class="screen-title">Checkout</span></span>
+          <span class="screen-line w70"></span>
+          <span class="screen-line w45"></span>
+          <span class="screen-line w60"></span>
+          <span class="screen-total">Total&nbsp;&nbsp;$128.00</span>
+        </span>
+        <span class="sample-meta"><strong>Checkout screen</strong><span>total, email, shipping address</span></span>
+      </button>
+      <button type="button" class="sample-card" id="sample-settings">
+        <span class="screen">
+          <span class="screen-bar"><i></i><i></i><i></i><span class="screen-title">Settings</span></span>
+          <span class="screen-line w55"></span>
+          <span class="screen-line w70"></span>
+          <span class="screen-line w40"></span>
+          <span class="screen-total">robin.ellis@example.com</span>
+        </span>
+        <span class="sample-meta"><strong>Settings page</strong><span>email, phone — and honest gaps</span></span>
+      </button>
+      <button type="button" class="sample-card" id="sample-profile">
+        <span class="screen">
+          <span class="screen-bar"><i></i><i></i><i></i><span class="screen-title">Profile</span></span>
+          <span class="screen-avatar"></span>
+          <span class="screen-line w50"></span>
+          <span class="screen-line w65"></span>
+          <span class="screen-total">(917) 555-0119</span>
+        </span>
+        <span class="sample-meta"><strong>Profile card</strong><span>contact details, portfolio link</span></span>
+      </button>
     </div>
+    <p class="hint saves-row">Classic saves instead:
+      <button type="button" class="chip" id="sample-place">Restaurant save</button>
+      <button type="button" class="chip" id="sample-event">Concert save</button>
+      <button type="button" class="chip" id="sample-product">Product save</button>
+    </p>
   </section>
 
-  <section aria-labelledby="output-heading">
-    <h2 id="output-heading">3. Structured JSON</h2>
-    <p id="status" class="status" role="status" aria-live="polite"></p>
-    <pre id="output" class="output">{ }
-Load a sample, paste text, then click “Extract → JSON”.</pre>
-    <div class="row" id="result-actions" hidden>
-      <button type="button" id="copy-button">Copy JSON</button>
-      <button type="button" id="download-button">Download JSON</button>
-    </div>
-    <p class="hint">Every field carries a confidence note. “high” means an
-    explicit pattern was found in the text; the title and the record type are
-    always guesses — verify them.</p>
-  </section>
+  <div class="workbench">
+    <section class="panel" aria-labelledby="source-heading">
+      <div class="panel-head">
+        <h2 id="source-heading">Source text</h2>
+        <span class="hint" id="char-count"></span>
+      </div>
+      <label class="sr-only" for="input-text">Text copied from a screen or screenshot</label>
+      <textarea id="input-text" rows="8" spellcheck="false"
+        placeholder="Paste text copied or OCR'd from a screen here… (extraction runs as you type)"></textarea>
+      <div class="row">
+        <button type="button" id="extract-button" class="primary">Extract → JSON</button>
+        <span class="hint">or just paste — it runs automatically</span>
+      </div>
+
+      <h3 class="subhead">Where things were found</h3>
+      <div id="source-view" class="source-view" aria-label="Source text with found fields highlighted">
+        <p class="source-empty">Load a sample or paste text — found fields light up here.</p>
+      </div>
+
+      <details class="ocr">
+        <summary>Have an actual image? OCR it in your browser (optional)</summary>
+        <div class="row wrap">
+          <input type="file" id="image-input" accept="image/*">
+          <button type="button" id="ocr-button">OCR my image</button>
+        </div>
+        <img id="preview" class="preview" alt="Preview of the selected image" hidden>
+        <p class="hint">OCR loads Tesseract.js from a CDN only when you click the
+        button. If it can’t load, you’ll get a clear message — the paste path
+        always works, fully offline.</p>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="record-heading">
+      <div class="panel-head">
+        <h2 id="record-heading">Record</h2>
+        <span id="summary" class="summary"></span>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <div id="uncertain" class="uncertain" hidden></div>
+
+      <ul id="fields" class="fields"></ul>
+
+      <div class="json-pane">
+        <div class="json-head">
+          <span class="json-title">JSON</span>
+          <span class="json-actions">
+            <button type="button" id="copy-button">Copy JSON</button>
+            <button type="button" id="download-button">Download</button>
+          </span>
+        </div>
+        <pre class="output"><code id="output">{ }
+Load a sample, paste text — the record appears here.</code></pre>
+      </div>
+      <p class="hint">Every field carries a confidence note. “High” means an
+      explicit pattern was found in the text; the title and the record type are
+      always guesses — verify them. Extraction is heuristic and will miss
+      things: it only finds what is explicitly written.</p>
+    </section>
+  </div>
 
   <footer>
-    <p>Python core: <code>python3 extractor.py sample/event-concert.txt</code> ·
+    <p>Python core: <code>python3 extractor.py sample/checkout-screen.txt</code> ·
     Heuristic demo — a production version would add an LLM structured-extraction
     pass (bring your own key). MIT licensed.</p>
   </footer>

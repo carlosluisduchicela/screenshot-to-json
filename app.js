@@ -9,9 +9,39 @@
  * 2. A deterministic heuristic extractor (a JS port of extractor.py).
  *    You can also paste OCR'd / copied text directly — that path works
  *    fully offline.
+ * 3. The workbench layer: per-field confidence bars, an "uncertain
+ *    fields" review list, and hover-to-source highlighting that shows
+ *    where each field was found in the raw text.
  */
 
 var SAMPLES = {
+  checkout:
+    "Checkout \u2014 Northwind Supply\n" +
+    "Canvas Field Jacket \u2014 Large, Olive\n" +
+    "Total $128.00\n" +
+    "Subtotal $112.00 \u00b7 Shipping $16.00 \u00b7 Free returns\n" +
+    "Receipt email: buyer@example.com\n" +
+    "Ship to 418 Mercer Street, New York, NY 10012\n" +
+    "Pay now: https://example.com/checkout/confirm\n",
+  settings:
+    "Settings \u2014 Account\n" +
+    "Profile\n" +
+    "Name: Robin Ellis\n" +
+    "Email: robin.ellis@example.com\n" +
+    "Phone: (646) 555-0183\n" +
+    "Notifications: On\n" +
+    "Language: English\n" +
+    "Privacy & security\n" +
+    "Support: https://example.com/support\n" +
+    "Version 4.2.0\n",
+  profile:
+    "Maya Chen\n" +
+    "Product Designer \u2014 Studio North\n" +
+    "maya@mayachen.example\n" +
+    "(917) 555-0119\n" +
+    "Portfolio: https://example.com/maya-chen\n" +
+    "Brooklyn, New York\n" +
+    "Available for freelance projects\n",
   place:
     "La Norte\u00f1a Taqueria\n" +
     "Saved from Instagram \u2014 Mexican restaurant, tacos, mezcal, mariscos\n" +
@@ -62,6 +92,7 @@ var PRODUCT_KEYWORDS = [
   "size:", "color:", "colour:", "sku", "shop", "price:",
   "add to bag", "checkout"
 ];
+var KEYWORDS_BY_TYPE = { place: PLACE_KEYWORDS, event: EVENT_KEYWORDS, product: PRODUCT_KEYWORDS };
 
 function countOccurrences(haystack, needle) {
   var count = 0, idx = 0;
@@ -120,8 +151,9 @@ function findPhone(text) {
 
 function findAddress(lines) {
   var street = /\b\d{1,5}\s+\S.*\b(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Place|Pl|Court|Ct|Parkway|Pkwy|Highway|Hwy)\b/i;
+  var label = /^(?:ship(?:ping)?\s+(?:to|address)|deliver\s+to|address|location)\s*:?\s+/i;
   for (var i = 0; i < lines.length; i++) {
-    if (street.test(lines[i])) return lines[i].replace(/,$/, "");
+    if (street.test(lines[i])) return lines[i].replace(/,$/, "").replace(label, "");
   }
   return null;
 }
@@ -181,17 +213,315 @@ function extract(text) {
   };
 }
 
+/* ---------- Evidence: where each field was found ---------- */
+
+var FIELD_ORDER = ["type", "title", "date", "time", "price", "phone", "email", "url", "address"];
+
+function rangeOf(m) { return m ? { start: m.index, end: m.index + m[0].length } : null; }
+
+function findEvidence(text, result) {
+  var ev = {};
+  FIELD_ORDER.forEach(function (k) { ev[k] = []; });
+  if (!text || !result) return ev;
+
+  var m;
+  m = text.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i)
+    || text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/)
+    || text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/);
+  if (result.date && m) ev.date.push(rangeOf(m));
+
+  m = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?[Mm]\.?\b/) || text.match(/\b([01]\d|2[0-3]):([0-5]\d)\b/);
+  if (result.time && m) ev.time.push(rangeOf(m));
+
+  m = text.match(/\$\s?\d{1,3}(?:,\d{3})*(?:\.\d{2})?\b|\$\s?\d+(?:\.\d{2})?\b/);
+  if (result.price && m) ev.price.push(rangeOf(m));
+
+  m = text.match(/\(?\b\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}\b/);
+  if (result.phone && m) ev.phone.push(rangeOf(m));
+
+  m = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+  if (result.email && m) ev.email.push(rangeOf(m));
+
+  m = text.match(/\b(?:https?:\/\/|www\.)[^\s<>()\[\]"']+/i);
+  if (result.url && m) ev.url.push({ start: m.index, end: m.index + m[0].replace(/[.,;]+$/, "").length });
+
+  // title: first non-empty line
+  var rawLines = text.split("\n");
+  var offset = 0, i, line;
+  for (i = 0; i < rawLines.length; i++) {
+    line = rawLines[i];
+    var trimmed = line.trim();
+    if (trimmed) {
+      if (result.title) {
+        var tStart = offset + line.indexOf(trimmed);
+        ev.title.push({ start: tStart, end: tStart + trimmed.length });
+      }
+      break;
+    }
+    offset += line.length + 1;
+  }
+  // address: the line the extractor picked
+  if (result.address) {
+    offset = 0;
+    var street = /\b\d{1,5}\s+\S.*\b(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Place|Pl|Court|Ct|Parkway|Pkwy|Highway|Hwy)\b/i;
+    for (i = 0; i < rawLines.length; i++) {
+      line = rawLines[i];
+      var lt = line.trim();
+      if (lt && street.test(lt)) {
+        var rel = lt.indexOf(result.address);
+        var aStart = offset + line.indexOf(lt) + (rel === -1 ? 0 : rel);
+        ev.address.push({ start: aStart, end: aStart + result.address.length });
+        break;
+      }
+      offset += line.length + 1;
+    }
+  }
+  // type: the keyword signals that drove the classification
+  if (result.type && result.type !== "unknown" && KEYWORDS_BY_TYPE[result.type]) {
+    var lowered = text.toLowerCase();
+    KEYWORDS_BY_TYPE[result.type].forEach(function (kw) {
+      var idx = 0, guard = 0;
+      while (guard < 8) {
+        idx = lowered.indexOf(kw, idx);
+        if (idx === -1) break;
+        ev.type.push({ start: idx, end: idx + kw.length });
+        idx += kw.length; guard += 1;
+      }
+    });
+  }
+  return ev;
+}
+
+/* ---------- Confidence ---------- */
+
+function confidenceOf(note) {
+  if (!note) return { level: "missing", label: "Missing", pct: 0 };
+  if (note.indexOf("high") === 0) return { level: "high", label: "High", pct: 94 };
+  if (note.indexOf("medium") === 0) return { level: "medium", label: "Medium", pct: 62 };
+  if (note.indexOf("low") === 0) return { level: "low", label: "Low", pct: 32 };
+  return { level: "missing", label: "Missing", pct: 0 };
+}
+
+function shortReason(field, result, note) {
+  if (result[field] === null || result[field] === undefined) return "not in the text";
+  if (field === "title") return "guessed from line 1";
+  if (field === "type") return result.type === "unknown" ? "no signal found" : "keyword guess — check it";
+  return note ? note.split(" - ")[1] || "" : "";
+}
+
 /* ---------- UI ---------- */
 
 var lastResult = null;
+var lastEvidence = null;
 var selectedImage = null;
+var debounceTimer = null;
 
 function el(id) { return document.getElementById(id); }
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 function setStatus(message, isError) {
   var status = el("status");
   status.textContent = message || "";
   status.className = isError ? "status error" : "status";
+}
+
+/* --- source viewer with per-line evidence marks --- */
+
+function renderSource(text, evidence) {
+  var view = el("source-view");
+  if (!text || !text.trim()) {
+    view.innerHTML = '<p class="source-empty">Load a sample or paste text \u2014 found fields light up here.</p>';
+    return;
+  }
+  // flatten evidence ranges with their field names
+  var ranges = [];
+  if (evidence) {
+    FIELD_ORDER.forEach(function (f) {
+      (evidence[f] || []).forEach(function (r) { ranges.push({ start: r.start, end: r.end, field: f }); });
+    });
+  }
+  var lines = text.split("\n");
+  var offset = 0;
+  var html = lines.map(function (line, li) {
+    var lineStart = offset;
+    offset += line.length + 1;
+    var lineRanges = ranges
+      .filter(function (r) { return r.end > lineStart && r.start < lineStart + line.length; })
+      .map(function (r) {
+        return {
+          start: Math.max(r.start, lineStart) - lineStart,
+          end: Math.min(r.end, lineStart + line.length) - lineStart,
+          field: r.field
+        };
+      })
+      .filter(function (r) { return r.end > r.start; })
+      .sort(function (a, b) { return a.start - b.start || b.end - a.end; });
+    var out = "", pos = 0;
+    lineRanges.forEach(function (r) {
+      if (r.start < pos) return; // skip overlaps; first field wins
+      out += escapeHtml(line.slice(pos, r.start));
+      out += '<mark class="ev" data-field="' + r.field + '">' + escapeHtml(line.slice(r.start, r.end)) + "</mark>";
+      pos = r.end;
+    });
+    out += escapeHtml(line.slice(pos));
+    if (!out) out = "&nbsp;";
+    return '<div class="src-line"><span class="ln">' + (li + 1) + '</span><span class="src-text">' + out + "</span></div>";
+  }).join("");
+  view.innerHTML = html;
+}
+
+function highlightField(field) {
+  var marks = el("source-view").querySelectorAll("mark.ev");
+  var first = null;
+  marks.forEach(function (mk) {
+    var on = field && mk.getAttribute("data-field") === field;
+    mk.classList.toggle("active", !!on);
+    if (on && !first) first = mk;
+  });
+  if (first) first.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/* --- field list with animated confidence bars --- */
+
+function renderFields(result) {
+  var list = el("fields");
+  list.innerHTML = "";
+  FIELD_ORDER.forEach(function (field, i) {
+    var conf = confidenceOf(result.confidence_notes[field]);
+    var value = result[field];
+    var li = document.createElement("li");
+    li.className = "field";
+    li.tabIndex = 0;
+    li.style.transitionDelay = (i * 45) + "ms";
+    li.setAttribute("aria-label", field + ": " + (value === null ? "not found" : value) + ", confidence " + conf.label);
+    var display = value === null
+      ? '<span class="field-value missing">not found</span>'
+      : '<span class="field-value" title="' + escapeHtml(value) + '">' + escapeHtml(value) + "</span>";
+    li.innerHTML =
+      '<span class="field-name">' + field + "</span>" +
+      display +
+      '<span class="field-conf"><span class="bar"><i class="' + conf.level + '" data-pct="' + conf.pct + '"></i></span>' +
+      '<span class="conf-label ' + conf.level + '">' + conf.label + "</span></span>";
+    li.addEventListener("mouseenter", function () { highlightField(field); });
+    li.addEventListener("mouseleave", function () { highlightField(null); });
+    li.addEventListener("focus", function () { highlightField(field); });
+    li.addEventListener("blur", function () { highlightField(null); });
+    list.appendChild(li);
+  });
+  // animate in on the next frame
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      list.querySelectorAll(".field").forEach(function (row) { row.classList.add("in"); });
+      list.querySelectorAll(".bar i").forEach(function (bar) {
+        bar.style.width = bar.getAttribute("data-pct") + "%";
+      });
+    });
+  });
+}
+
+/* --- "needs a second look" panel: designed, not broken --- */
+
+function renderUncertain(result) {
+  var panel = el("uncertain");
+  var shaky = [], missing = [];
+  FIELD_ORDER.forEach(function (field) {
+    var conf = confidenceOf(result.confidence_notes[field]);
+    if (result[field] === null) missing.push(field);
+    else if (conf.level === "low" || conf.level === "medium") shaky.push(field);
+  });
+  if (!shaky.length && !missing.length) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+  var items = "";
+  shaky.forEach(function (f) {
+    items += '<li data-field="' + f + '"><b>' + f + "</b> · " + escapeHtml(shortReason(f, result, result.confidence_notes[f])) + "</li>";
+  });
+  missing.forEach(function (f) {
+    items += '<li data-field="' + f + '"><b>' + f + "</b> · not in the text</li>";
+  });
+  var lead = missing.length && !shaky.length
+    ? "Nothing shaky \u2014 but these fields simply aren\u2019t in this screen. They stay null rather than guessed."
+    : "These are guesses or gaps, kept visible on purpose. Hover any item to check it against the source.";
+  panel.innerHTML =
+    '<h3><span class="badge-warn">!</span> Needs a second look</h3>' +
+    "<p>" + lead + "</p><ul>" + items + "</ul>";
+  panel.hidden = false;
+  panel.querySelectorAll("li").forEach(function (li) {
+    li.addEventListener("mouseenter", function () { highlightField(li.getAttribute("data-field")); });
+    li.addEventListener("mouseleave", function () { highlightField(null); });
+  });
+}
+
+/* --- syntax-highlighted JSON --- */
+
+function highlightJson(json) {
+  var esc = escapeHtml(json);
+  return esc.replace(/("(\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*")(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(\.\d+)?([eE][+-]?\d+)?/g, function (match, str, _e, colon, kw, _f, _exp) {
+    if (str) return colon ? '<span class="k">' + str + "</span>" + colon : '<span class="s">' + str + "</span>";
+    if (kw) return '<span class="n">' + match + "</span>";
+    if (match === "null") return '<span class="null">null</span>';
+    return '<span class="n">' + match + "</span>";
+  });
+}
+
+function renderJson(result) {
+  el("output").innerHTML = highlightJson(JSON.stringify(result, null, 2));
+}
+
+function renderSummary(result) {
+  var found = FIELD_ORDER.filter(function (f) { return result[f] !== null; }).length;
+  el("summary").innerHTML = "<b>" + found + " of " + FIELD_ORDER.length + "</b> fields found";
+}
+
+/* --- extraction run --- */
+
+function runExtraction(announce) {
+  var text = el("input-text").value;
+  el("char-count").textContent = text.length ? text.length + " chars" : "";
+  if (!text.trim()) {
+    lastResult = null; lastEvidence = null;
+    renderSource("", null);
+    el("fields").innerHTML = "";
+    el("uncertain").hidden = true;
+    el("summary").textContent = "";
+    el("output").textContent = "{ }\nPaste text or load a sample \u2014 the record appears here.";
+    if (announce) setStatus("Paste some text (or load a sample) first.", true);
+    return;
+  }
+  lastResult = extract(text);
+  lastEvidence = findEvidence(text, lastResult);
+  renderFields(lastResult);
+  renderUncertain(lastResult);
+  renderJson(lastResult);
+  renderSummary(lastResult);
+  renderSource(text, lastEvidence);
+  if (announce) {
+    var found = FIELD_ORDER.filter(function (f) { return lastResult[f] !== null; }).length;
+    setStatus("Extracted \u2014 " + found + " of " + FIELD_ORDER.length + " fields found. Hover a field to see where it came from.");
+  }
+}
+
+function scheduleExtraction() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(function () { runExtraction(false); }, 450);
+}
+
+function selectSampleCard(key) {
+  document.querySelectorAll(".sample-card, .chip").forEach(function (b) {
+    b.classList.toggle("selected", b.id === "sample-" + key);
+  });
+}
+
+function loadSample(key) {
+  el("input-text").value = SAMPLES[key];
+  selectSampleCard(key);
+  runExtraction(false);
+  setStatus("Sample extracted. Hover any field to see where it was found.");
 }
 
 function loadScript(src) {
@@ -206,11 +536,20 @@ function loadScript(src) {
 
 function init() {
   Object.keys(SAMPLES).forEach(function (key) {
-    el("sample-" + key).addEventListener("click", function () {
-      el("input-text").value = SAMPLES[key];
-      setStatus("Sample loaded. Click Extract.");
-    });
+    var btn = el("sample-" + key);
+    if (btn) btn.addEventListener("click", function () { loadSample(key); });
   });
+
+  el("input-text").addEventListener("input", function () {
+    selectSampleCard("__none__");
+    el("char-count").textContent = el("input-text").value.length + " chars";
+    renderSource(el("input-text").value, null);
+    scheduleExtraction();
+  });
+  el("input-text").addEventListener("keydown", function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") runExtraction(true);
+  });
+  el("extract-button").addEventListener("click", function () { runExtraction(true); });
 
   el("image-input").addEventListener("change", function (event) {
     var file = event.target.files && event.target.files[0];
@@ -219,12 +558,12 @@ function init() {
     if (!file) { preview.hidden = true; preview.removeAttribute("src"); return; }
     preview.src = URL.createObjectURL(file);
     preview.hidden = false;
-    setStatus("Image selected. Click \u201cOCR my image\u201d, or paste text below instead.");
+    setStatus("Image selected. Click \u201cOCR my image\u201d, or paste text instead.");
   });
 
   el("ocr-button").addEventListener("click", function () {
     if (!selectedImage) {
-      setStatus("Choose an image first \u2014 or paste text below; that path works fully offline.", true);
+      setStatus("Choose an image first \u2014 or paste text; that path works fully offline.", true);
       return;
     }
     setStatus("Loading OCR engine from CDN\u2026");
@@ -244,29 +583,18 @@ function init() {
           return;
         }
         el("input-text").value = text;
-        setStatus("OCR done \u2014 text is in the box below. Review it, then click Extract.");
+        runExtraction(false);
+        setStatus("OCR done \u2014 review the text, the record is already extracted.");
       })
       .catch(function () {
         setStatus("OCR could not load or run (offline, CDN blocked, or unsupported image). " +
-                  "No problem: paste the text from the screenshot into the box below \u2014 " +
+                  "No problem: paste the text from the screenshot instead \u2014 " +
                   "that path works fully offline.", true);
       });
   });
 
-  el("extract-button").addEventListener("click", function () {
-    var text = el("input-text").value;
-    if (!text.trim()) {
-      setStatus("Paste some text (or load a sample) first.", true);
-      return;
-    }
-    lastResult = extract(text);
-    el("output").textContent = JSON.stringify(lastResult, null, 2);
-    el("result-actions").hidden = false;
-    setStatus("Extracted. Fields marked \u201cnot found\u201d were not explicit in the text.");
-  });
-
   el("copy-button").addEventListener("click", function () {
-    if (!lastResult) return;
+    if (!lastResult) { setStatus("Nothing to copy yet \u2014 extract something first.", true); return; }
     var payload = JSON.stringify(lastResult, null, 2);
     function done() { setStatus("JSON copied to clipboard."); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -277,7 +605,7 @@ function init() {
   });
 
   el("download-button").addEventListener("click", function () {
-    if (!lastResult) return;
+    if (!lastResult) { setStatus("Nothing to download yet \u2014 extract something first.", true); return; }
     var blob = new Blob([JSON.stringify(lastResult, null, 2)], { type: "application/json" });
     var link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -287,6 +615,9 @@ function init() {
     document.body.removeChild(link);
     setStatus("JSON downloaded.");
   });
+
+  // Land on a worked example: a stranger should get it in five seconds.
+  loadSample("checkout");
 }
 
 if (typeof document !== "undefined") {

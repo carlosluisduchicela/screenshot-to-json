@@ -1,0 +1,7 @@
+Checkout — Northwind Supply
+Canvas Field Jacket — Large, Olive
+Total $128.00
+Subtotal $112.00 · Shipping $16.00 · Free returns
+Receipt email: buyer@example.com
+Ship to 418 Mercer Street, New York, NY 10012
+Pay now: https://example.com/checkout/confirm

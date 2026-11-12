@@ -120,10 +120,16 @@ def _find_phone(text):
     return m.group(0).strip()
 
 
+ADDRESS_LABEL_RE = re.compile(
+    r"^(?:ship(?:ping)?\s+(?:to|address)|deliver\s+to|address|location)\s*:?\s+",
+    re.IGNORECASE,
+)
+
+
 def _find_address(lines):
     for line in lines:
         if STREET_RE.search(line):
-            return line.strip().strip(",")
+            return ADDRESS_LABEL_RE.sub("", line.strip().strip(","))
     return None
 
 
