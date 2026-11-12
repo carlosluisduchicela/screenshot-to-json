@@ -4,7 +4,7 @@
  *
  * Honest pipeline: there is NO server and NO server-side LLM.
  * 1. Optional in-browser OCR: Tesseract.js is loaded dynamically from a
- *    CDN only when you click "OCR my image". If it is offline/blocked,
+ *    CDN only when you click "read my screenshot". If it is offline/blocked,
  *    you get a clear failure message and the paste-text path still works.
  * 2. A deterministic heuristic extractor (a JS port of extractor.py).
  *    You can also paste OCR'd / copied text directly — that path works
@@ -41,30 +41,7 @@ var SAMPLES = {
     "(917) 555-0119\n" +
     "Portfolio: https://example.com/maya-chen\n" +
     "Brooklyn, New York\n" +
-    "Available for freelance projects\n",
-  place:
-    "La Norte\u00f1a Taqueria\n" +
-    "Saved from Instagram \u2014 Mexican restaurant, tacos, mezcal, mariscos\n" +
-    "214 Grand Street, New York, NY 10002\n" +
-    "(212) 555-0147\n" +
-    "Open for dinner \u2014 reservations for a table for 2\n" +
-    "https://example.com/la-nortena\n",
-  event:
-    "The Night Owls \u2014 Live at Warsaw\n" +
-    "Live music \u2014 concert tickets\n" +
-    "Saturday, November 21, 2026\n" +
-    "Doors 7:00 PM, Show 8:00 PM\n" +
-    "261 Driggs Avenue, Brooklyn, NY 11222\n" +
-    "Tickets $35\n" +
-    "https://example.com/tickets/night-owls\n",
-  product:
-    "Canvas Field Jacket\n" +
-    "Shop \u2014 Add to cart\n" +
-    "Price: $128.00\n" +
-    "In stock \u2014 free shipping and returns\n" +
-    "Size: Large, Color: Olive\n" +
-    "Buy now at https://example.com/shop/field-jacket\n" +
-    "Questions: care@example.com\n"
+    "Available for freelance projects\n"
 };
 
 /* ---------- Heuristic extractor (JS port of extractor.py) ---------- */
@@ -333,7 +310,7 @@ function setStatus(message, isError) {
 function renderSource(text, evidence) {
   var view = el("source-view");
   if (!text || !text.trim()) {
-    view.innerHTML = '<p class="source-empty">Load a sample or paste text \u2014 found fields light up here.</p>';
+    view.innerHTML = '<p class="source-empty">paste text or try a sample \u2014 found fields light up here.</p>';
     return;
   }
   // flatten evidence ranges with their field names
@@ -489,7 +466,7 @@ function runExtraction(announce) {
     el("fields").innerHTML = "";
     el("uncertain").hidden = true;
     el("summary").textContent = "";
-    el("output").textContent = "{ }\nPaste text or load a sample \u2014 the record appears here.";
+    el("output").textContent = "{ }\npaste text \u2014 the record appears here.";
     if (announce) setStatus("Paste some text (or load a sample) first.", true);
     return;
   }
@@ -512,7 +489,7 @@ function scheduleExtraction() {
 }
 
 function selectSampleCard(key) {
-  document.querySelectorAll(".sample-card, .chip").forEach(function (b) {
+  document.querySelectorAll(".chip").forEach(function (b) {
     b.classList.toggle("selected", b.id === "sample-" + key);
   });
 }
@@ -522,6 +499,47 @@ function loadSample(key) {
   selectSampleCard(key);
   runExtraction(false);
   setStatus("Sample extracted. Hover any field to see where it was found.");
+}
+
+/* --- own-data intake: drop zone, file picker, paste --- */
+
+function setImageFile(file) {
+  selectedImage = file || null;
+  var preview = el("preview");
+  if (!file) { preview.hidden = true; preview.removeAttribute("src"); return; }
+  preview.src = URL.createObjectURL(file);
+  preview.hidden = false;
+  setStatus("screenshot ready \u2014 click \u201cread my screenshot\u201d to pull its text, or paste text instead.");
+}
+
+function usePastedText(text) {
+  el("input-text").value = text;
+  selectSampleCard("__none__");
+  runExtraction(false);
+  setStatus("pasted \u2014 record extracted. hover a field to see where it came from.");
+}
+
+function handleFiles(files) {
+  if (!files || !files.length) return;
+  var file = files[0];
+  if (file.type && file.type.indexOf("image/") === 0) {
+    setImageFile(file);
+    return;
+  }
+  if ((file.type && file.type.indexOf("text/") === 0) || /\.txt$/i.test(file.name || "")) {
+    file.text().then(function (text) {
+      if (text && text.trim()) {
+        usePastedText(text);
+        setStatus("text file loaded \u2014 record extracted. hover a field to see where it came from.");
+      } else {
+        setStatus("that text file is empty \u2014 paste the screen text instead.", true);
+      }
+    }, function () {
+      setStatus("could not read that file \u2014 paste the screen text instead.", true);
+    });
+    return;
+  }
+  setStatus("that file is not an image or a text file \u2014 drop a screenshot, or paste text instead.", true);
 }
 
 function loadScript(src) {
@@ -553,17 +571,51 @@ function init() {
 
   el("image-input").addEventListener("change", function (event) {
     var file = event.target.files && event.target.files[0];
-    selectedImage = file || null;
-    var preview = el("preview");
-    if (!file) { preview.hidden = true; preview.removeAttribute("src"); return; }
-    preview.src = URL.createObjectURL(file);
-    preview.hidden = false;
-    setStatus("Image selected. Click \u201cOCR my image\u201d, or paste text instead.");
+    setImageFile(file || null);
+  });
+
+  var dropzone = el("dropzone");
+  dropzone.addEventListener("click", function () { el("image-input").click(); });
+  dropzone.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      el("image-input").click();
+    }
+  });
+  dropzone.addEventListener("dragover", function (event) {
+    event.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+  dropzone.addEventListener("dragleave", function () {
+    dropzone.classList.remove("dragover");
+  });
+  dropzone.addEventListener("drop", function (event) {
+    event.preventDefault();
+    dropzone.classList.remove("dragover");
+    handleFiles(event.dataTransfer && event.dataTransfer.files);
+  });
+  // pasting anywhere except into a form field counts as "use your own screen":
+  // an image goes to the ocr path, text extracts on the spot.
+  document.addEventListener("paste", function (event) {
+    var target = event.target;
+    if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT")) return;
+    var data = event.clipboardData;
+    if (!data) return;
+    if (data.files && data.files.length) {
+      event.preventDefault();
+      handleFiles(data.files);
+      return;
+    }
+    var text = data.getData ? data.getData("text/plain") : "";
+    if (text && text.trim()) {
+      event.preventDefault();
+      usePastedText(text);
+    }
   });
 
   el("ocr-button").addEventListener("click", function () {
     if (!selectedImage) {
-      setStatus("Choose an image first \u2014 or paste text; that path works fully offline.", true);
+      setStatus("add a screenshot first \u2014 drop one above or use the file picker \u2014 or paste text; that path works fully offline.", true);
       return;
     }
     setStatus("Loading OCR engine from CDN\u2026");

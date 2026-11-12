@@ -25,8 +25,9 @@ seconds, without sending my data to a server.”
 - Output: one JSON record — `type` (`place` / `event` / `product` /
   `unknown`), `title`, `date`, `time`, `price`, `phone`, `email`, `url`,
   `address` — plus a `confidence_notes` entry **for every field**.
-- Three fake sample saves (restaurant, concert, product) shared by the web
-  demo, the CLI, and the tests. All sample data is fake.
+- Fake sample texts in `sample/`: three screens (checkout, settings,
+  profile) power the web demo's sample chips; three saves (restaurant,
+  concert, product) serve the CLI and the tests. All sample data is fake.
 - Copy JSON and Download JSON from the demo.
 
 ## Non-goals

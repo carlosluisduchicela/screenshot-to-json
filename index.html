@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>screenshot-to-json — messy screen in, clean JSON out</title>
-<meta name="description" content="An extraction workbench: paste the text from any app screen and get a structured JSON record with per-field confidence. Runs fully in your browser.">
+<title>screenshot-to-json — messy screen in, clean json out</title>
+<meta name="description" content="bring a screen of your own — paste its text, or upload the image and read it here — and get a structured json record with a confidence note on every field. runs fully in your browser.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,95 +15,74 @@
       <span class="logo" aria-hidden="true">{ ; }</span>
       <span class="brand-name">screenshot-to-json</span>
     </div>
-    <span class="badge">no server · nothing leaves your browser</span>
   </header>
 
   <section class="hero">
-    <h1>Messy screen in.<br>Clean JSON out.</h1>
-    <p class="tagline">Paste the text from any app screen — a checkout, a settings
-    page, a profile — and get a structured record with a confidence check on
-    every field. Hover a field to see exactly where it was found.</p>
+    <h1>messy screen in.<br>clean json out.</h1>
+    <p class="tagline">bring a screen of your own — paste its text, or upload the
+    image and read it here. you get a structured record back: every field as
+    json, a confidence note on each one, and hover any field to see exactly
+    where it was found.</p>
+  </section>
+
+  <section aria-labelledby="own-heading">
+    <div class="section-head">
+      <h2 id="own-heading">use your own screen</h2>
+      <span class="hint">yours first — samples are below, if you need one.</span>
+    </div>
+
+    <div class="dropzone" id="dropzone" tabindex="0" role="button"
+         aria-label="paste your screen — drop a screenshot, click to upload, or paste text">
+      <span class="dz-title">paste your screen</span>
+      <span class="dz-sub">drop a screenshot, click to upload, or paste text</span>
+    </div>
+
+    <div class="ocr-block">
+      <p class="ocr-label">have the image instead? upload the screenshot — it's
+      read in your browser, nothing is sent anywhere</p>
+      <div class="row wrap">
+        <input type="file" id="image-input" accept="image/*">
+        <button type="button" id="ocr-button" class="primary">read my screenshot</button>
+      </div>
+      <img id="preview" class="preview" alt="Preview of the selected screenshot" hidden>
+      <p class="hint">the ocr engine (tesseract.js) loads from a cdn only when
+      you click the button — never on page load. if it can't load, you'll get a
+      clear message, and the paste path always works, fully offline.</p>
+    </div>
+
+    <label class="textarea-label" for="input-text">paste the text from your screen here — the record builds itself as you paste</label>
+    <textarea id="input-text" rows="8" spellcheck="false"
+      placeholder="paste the text from your screen here — the record builds itself as you paste"></textarea>
+    <div class="row">
+      <button type="button" id="extract-button">extract → json</button>
+      <span class="hint" id="char-count"></span>
+    </div>
   </section>
 
   <section aria-labelledby="samples-heading">
     <div class="section-head">
-      <h2 id="samples-heading">Try a screen</h2>
-      <span class="hint">Click one — extraction is instant.</span>
+      <h2 id="samples-heading">no screen handy? try a sample</h2>
     </div>
-    <div class="sample-grid">
-      <button type="button" class="sample-card" id="sample-checkout">
-        <span class="screen">
-          <span class="screen-bar"><i></i><i></i><i></i><span class="screen-title">Checkout</span></span>
-          <span class="screen-line w70"></span>
-          <span class="screen-line w45"></span>
-          <span class="screen-line w60"></span>
-          <span class="screen-total">Total&nbsp;&nbsp;$128.00</span>
-        </span>
-        <span class="sample-meta"><strong>Checkout screen</strong><span>total, email, shipping address</span></span>
-      </button>
-      <button type="button" class="sample-card" id="sample-settings">
-        <span class="screen">
-          <span class="screen-bar"><i></i><i></i><i></i><span class="screen-title">Settings</span></span>
-          <span class="screen-line w55"></span>
-          <span class="screen-line w70"></span>
-          <span class="screen-line w40"></span>
-          <span class="screen-total">robin.ellis@example.com</span>
-        </span>
-        <span class="sample-meta"><strong>Settings page</strong><span>email, phone — and honest gaps</span></span>
-      </button>
-      <button type="button" class="sample-card" id="sample-profile">
-        <span class="screen">
-          <span class="screen-bar"><i></i><i></i><i></i><span class="screen-title">Profile</span></span>
-          <span class="screen-avatar"></span>
-          <span class="screen-line w50"></span>
-          <span class="screen-line w65"></span>
-          <span class="screen-total">(917) 555-0119</span>
-        </span>
-        <span class="sample-meta"><strong>Profile card</strong><span>contact details, portfolio link</span></span>
-      </button>
+    <div class="sample-chips">
+      <button type="button" class="chip" id="sample-checkout">checkout screen</button>
+      <button type="button" class="chip" id="sample-settings">settings page</button>
+      <button type="button" class="chip" id="sample-profile">profile card</button>
     </div>
-    <p class="hint saves-row">Classic saves instead:
-      <button type="button" class="chip" id="sample-place">Restaurant save</button>
-      <button type="button" class="chip" id="sample-event">Concert save</button>
-      <button type="button" class="chip" id="sample-product">Product save</button>
-    </p>
   </section>
 
   <div class="workbench">
     <section class="panel" aria-labelledby="source-heading">
       <div class="panel-head">
-        <h2 id="source-heading">Source text</h2>
-        <span class="hint" id="char-count"></span>
+        <h2 id="source-heading">where things were found</h2>
       </div>
-      <label class="sr-only" for="input-text">Text copied from a screen or screenshot</label>
-      <textarea id="input-text" rows="8" spellcheck="false"
-        placeholder="Paste text copied or OCR'd from a screen here… (extraction runs as you type)"></textarea>
-      <div class="row">
-        <button type="button" id="extract-button" class="primary">Extract → JSON</button>
-        <span class="hint">or just paste — it runs automatically</span>
-      </div>
-
-      <h3 class="subhead">Where things were found</h3>
       <div id="source-view" class="source-view" aria-label="Source text with found fields highlighted">
-        <p class="source-empty">Load a sample or paste text — found fields light up here.</p>
+        <p class="source-empty">paste text or try a sample — found fields light up here.</p>
       </div>
-
-      <details class="ocr">
-        <summary>Have an actual image? OCR it in your browser (optional)</summary>
-        <div class="row wrap">
-          <input type="file" id="image-input" accept="image/*">
-          <button type="button" id="ocr-button">OCR my image</button>
-        </div>
-        <img id="preview" class="preview" alt="Preview of the selected image" hidden>
-        <p class="hint">OCR loads Tesseract.js from a CDN only when you click the
-        button. If it can’t load, you’ll get a clear message — the paste path
-        always works, fully offline.</p>
-      </details>
     </section>
 
-    <section class="panel" aria-labelledby="record-heading">
+    <section class="panel record" aria-labelledby="record-heading">
       <div class="panel-head">
-        <h2 id="record-heading">Record</h2>
+        <h2 id="record-heading">record</h2>
         <span id="summary" class="summary"></span>
       </div>
       <p id="status" class="status" role="status" aria-live="polite"></p>
@@ -121,19 +100,20 @@
           </span>
         </div>
         <pre class="output"><code id="output">{ }
-Load a sample, paste text — the record appears here.</code></pre>
+paste text — the record appears here.</code></pre>
       </div>
-      <p class="hint">Every field carries a confidence note. “High” means an
+      <p class="hint">every field carries a confidence note. "high" means an
       explicit pattern was found in the text; the title and the record type are
-      always guesses — verify them. Extraction is heuristic and will miss
+      always guesses — verify them. extraction is heuristic and will miss
       things: it only finds what is explicitly written.</p>
     </section>
   </div>
 
   <footer>
-    <p>Python core: <code>python3 extractor.py sample/checkout-screen.txt</code> ·
-    Heuristic demo — a production version would add an LLM structured-extraction
-    pass (bring your own key). MIT licensed.</p>
+    <p>everything runs in your browser; nothing leaves the page.</p>
+    <p>python core: <code>python3 extractor.py sample/checkout-screen.txt</code> ·
+    heuristic demo — a production version would add an llm structured-extraction
+    pass (bring your own key). mit licensed.</p>
   </footer>
 </main>
 <script src="app.js"></script>

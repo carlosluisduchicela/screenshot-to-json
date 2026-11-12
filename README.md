@@ -11,7 +11,7 @@ Screenshot in, structured record out — an extraction workbench: paste or OCR t
         |                                     |
         v                                     |
   [Optional, in-browser]                      |
-  OCR my image                                |
+  read my screenshot                          |
   Tesseract.js loads from a CDN               |
   ONLY when you click the button              |
   (clear failure message if                   |
@@ -41,16 +41,18 @@ fully offline.
 
 ## What it does
 
-- **Image upload with preview** and an optional **“OCR my image”** button.
-  Tesseract.js is loaded dynamically from a CDN only on that click; if the
-  load or the OCR fails, you get a plain-language message and can paste text
-  instead.
+- **Own screen first:** a drop zone takes a screenshot (drag-and-drop or
+  click to upload) or pasted text — pasting anywhere on the page extracts on
+  the spot. Image upload comes with a preview and a **“read my screenshot”**
+  button. Tesseract.js is loaded dynamically from a CDN only on that click;
+  if the load or the OCR fails, you get a plain-language message and can
+  paste text instead.
 - **Paste-text extraction** from anything: a screenshot’s copied text, a
   share-sheet dump, OCR output from another tool. Extraction runs as you
   type — no button required.
-- **Clickable screen samples** built into the demo: a checkout screen, a
-  settings page, and a profile card (plus the classic restaurant / concert /
-  product saves). All sample data is fake; the files live in `sample/`.
+- **Sample chips** under the drop zone, for anyone without a screen handy:
+  a checkout screen, a settings page, and a profile card. All sample data is
+  fake; the files live in `sample/`.
 - **A workbench, not a text box:** per-field confidence bars that animate
   in, a “Needs a second look” panel that treats guesses and gaps as a
   designed review state, and hover-any-field highlighting that shows exactly
@@ -138,7 +140,8 @@ python3 -m unittest discover -s tests -v
 
 - `index.html` / `app.js` / `styles.css` — the static web demo (JS extractor included)
 - `extractor.py` — the Python core, same rules, CLI + importable `extract(text)`
-- `sample/*.txt` — the three fake samples used by both the demo and the tests
+- `sample/*.txt` — fake texts: the three screens power the demo's chips; the
+  three saves (restaurant, concert, product) serve the CLI and the tests
 - `tests/test_extractor.py` — `unittest` coverage for the samples and empty input
 - `docs/PRD.md` — the one-page product spec
 
